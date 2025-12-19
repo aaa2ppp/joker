@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+
+export ASSUME_ALWAYS_YES=yes 
+
+pkg update
+pkg install -y py311-iocage
+iocage activate workpool
+
+# Создаём шаблон
+iocage create -r 15.0-RELEASE -n go-dev template=yes
+
+# Настраиваем
+iocage exec go-dev pkg install -y go git bash curl
+iocage set boot=off go-dev  # шаблон не стартует

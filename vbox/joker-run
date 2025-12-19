@@ -1,0 +1,31 @@
+#!/bin/sh
+# joker-run — выполняет СКРИПТ ИЛИ КОМАНДУ внутри joker
+
+set -e
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <script.sh> | <command> [args...]"
+    exit 1
+fi
+
+name="joker"
+remote_host="127.0.0.1"
+
+ssh_dir="${SSH_DIR:-"./.ssh"}"
+ssh_opts="-i $ssh_dir/id_ed25519 -o UserKnownHostsFile=$ssh_dir/known_hosts"
+
+# Если первый аргумент — существующий файл, это скрипт
+if [ -f "$1" ]; then
+    SCRIPT="$1"
+    shift
+    # Копируем скрипт в VM (временный файл)
+    REMOTE_SCRIPT="/tmp/$(basename "$SCRIPT").$$"
+    scp $ssh_opts -P 2222 "$SCRIPT" $name@$remote_host:"$REMOTE_SCRIPT"
+    # Выполняем + удаляем
+    CMD=$(printf '%q ' "$REMOTE_SCRIPT" "$@")
+    ssh $ssh_opts -p 2222 $name@$remote_host "chmod +x '$REMOTE_SCRIPT' && su -m root -c '$CMD' && rm '$REMOTE_SCRIPT'"
+else
+    # Выполняем команду напрямую
+    CMD=$(printf '%q ' "$@")
+    ssh $ssh_opts -p 2222 $name@$remote_host "su -m root -c '$CMD'"
+fi
