@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+ASSUME_ALWAYS_YES=yes
+
+pkg install -y bash mc
+
+if [ -e /usr/local/bin/bash ]; then
+    pw usermod joker -s /usr/local/bin/bash
+fi

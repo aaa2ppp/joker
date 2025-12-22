@@ -6,10 +6,12 @@ IMAGE_DIR       := ./image
 TMP_DIR         := ./tmp
 SSH_DIR         := ./.ssh
 
+SHARED_FOLDER := $(shell echo ~/Projects)
+
 NAME=joker
 
-VBoxManage := $(shell vbox-manage-path.sh)
-VMName     := FreeBSD-$(NAME)
+VBoxManage := $(shell sh vbox-manage-path.sh)
+VMName     := FreeBSD-joker
 MemoryMB   := 4096
 DiskSizeGB := 30
 CPUCount   := 2
@@ -31,7 +33,7 @@ all:
 
 .PHONY: help
 help: ## Показать эту справку
-	@echo "  $(NAME) - FreeBSD jail dev platform"
+	@echo "  joker - FreeBSD jail dev platform"
 	@echo "======================================="
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST) 
 
@@ -65,10 +67,11 @@ $(IMAGE_DIR)/$(FREEBSD_VERSION)/$(FREEBSD_IMAGE): $(IMAGE_DIR)/$(FREEBSD_VERSION
 
 # Создаем эталонную VM (рабочие клоны со снапшота initial)
 .create-FreeBSD-$(FREEBSD_VERSION): $(IMAGE_DIR)/$(FREEBSD_VERSION)/$(FREEBSD_IMAGE)
-	'$(VBoxManage)' createvm --name='FreeBSD-$(FREEBSD_VERSION)' --platform-architecture=x86 --ostype FreeBSD_64 --register
-	'$(VBoxManage)' storagectl 'FreeBSD-$(FREEBSD_VERSION)' --name SATA --add sata --controller IntelAhci
+	#'$(VBoxManage)' createvm --name='FreeBSD-$(FREEBSD_VERSION)' --platform-architecture=x86 --ostype FreeBSD_64 --register
+	'$(VBoxManage)' createvm  --name='FreeBSD-$(FREEBSD_VERSION)' --ostype FreeBSD_64 --default --register
+	'$(VBoxManage)' storagectl    'FreeBSD-$(FREEBSD_VERSION)' --name SATA --add sata --controller IntelAhci
 	'$(VBoxManage)' storageattach 'FreeBSD-$(FREEBSD_VERSION)' --storagectl "SATA" --port 0 --device 0 --type hdd --medium '$(IMAGE_DIR)/$(FREEBSD_VERSION)/$(FREEBSD_IMAGE)'
-	'$(VBoxManage)' snapshot 'FreeBSD-$(FREEBSD_VERSION)' take initial
+	'$(VBoxManage)' snapshot      'FreeBSD-$(FREEBSD_VERSION)' take initial
 	touch '$@'
 
 .PHONY: create-freebsd
@@ -76,64 +79,93 @@ create-freebsd: .create-FreeBSD-$(FREEBSD_VERSION) ## Скачать образ 
 
 .PHONY: delete-freebsd
 delete-freebsd: ## Удалить эталонную VM
-	'$(VBoxManage)' unregistervm 'FreeBSD-$(FREEBSD_VERSION)'
+	'$(VBoxManage)' snapshot      'FreeBSD-$(FREEBSD_VERSION)' delete initial
+	'$(VBoxManage)' storageattach 'FreeBSD-$(FREEBSD_VERSION)' --storagectl SATA --port 0 --device 0 --medium none
+	'$(VBoxManage)' unregistervm  'FreeBSD-$(FREEBSD_VERSION)' --delete
 	rm '.create-FreeBSD-$(FREEBSD_VERSION)'
+
+
+# Создаем клон для joker
+.create-joker: .create-FreeBSD-$(FREEBSD_VERSION)
+	'$(VBoxManage)' clonevm 'FreeBSD-$(FREEBSD_VERSION)' --mode=machine --name=$(VMName) --register --options=linked --snapshot=initial
+	'$(VBoxManage)' modifyvm '$(VMName)' --memory $(MemoryMB) --cpus '$(CPUCount)'
+	'$(VBoxManage)' modifyvm '$(VMName)' --nic1 nat --natpf1 'ssh,tcp,,2222,,22'
+	'$(VBoxManage)' modifyvm '$(VMName)' --natpf1 'joker-api,tcp,,2375,,2375'
+	'$(VBoxManage)' sharedfolder add '$(VMName)' --name='projects' \
+		--hostpath='$(SHARED_FOLDER)' --automount --auto-mount-point=/home/joker/projects
+	touch '$@'
+
+.PHONY: create-joker 
+create-joker: .create-joker ## Создать рабочую VM (клон от initial-снапшота)
+
+.PHONY: delete-joker
+delete-joker: ## Удалить рабочую VM
+	-$(MAKE) joker-detach-data-disk
+	-'$(VBoxManage)' snapshot '$(VMName)' delete first-boot
+	-rm .first-boot
+	'$(VBoxManage)' unregistervm '$(VMName)' --delete
+	-rm -fr ./.ssh
+	rm .create-joker
 
 
 $(DATA_DISK_VDI):
 	'$(VBoxManage)' createmedium disk --filename '$(DATA_DISK_VDI)' --size $$(( $(DATA_DISK_SIZE_GB) * 1024 ))
 
-.PHONY: create-$(NAME)-data-disk
-create-$(NAME)-data-disk: $(DATA_DISK_VDI)
+.PHONY: create-data-disk
+create-data-disk: $(DATA_DISK_VDI)
 
-.$(NAME)-attach-data-disk: $(DATA_DISK_VDI)
+.attach-data-disk: .create-joker $(DATA_DISK_VDI)
 	'$(VBoxManage)' storageattach '$(VMName)' --storagectl SATA --port 1 --device 0 --type hdd --medium '$(DATA_DISK_VDI)'
 	touch '$@'
 
-.PHONY: $(NAME)-detach-data-disk $(NAME)-detach-data-disk
-$(NAME)-attach-data-disk: .$(NAME)-attach-data-disk
-$(NAME)-detach-data-disk:
+.PHONY: attach-data-disk detach-data-disk
+attach-data-disk: .attach-data-disk
+detach-data-disk:
 	'$(VBoxManage)' storageattach '$(VMName)' --storagectl SATA --port 1 --device 0 --type hdd --medium none
-	rm .$(NAME)-attach-data-disk
+	rm .attach-data-disk
 
+.first-boot: .create-joker
+	VBoxManage='$(VBoxManage)' VMName='$(VMName)' \
+		TMP_DIR='$(TMP_DIR)' SSH_DIR='$(SSH_DIR)' sh first-boot.sh
+	'$(VBoxManage)' controlvm '$(VMName)' acpipowerbutton	
+	VBoxManage='$(VBoxManage)' VMName='$(VMName)' sh wait-for-poweroff.sh
+	'$(VBoxManage)' snapshot '$(VMName)' take first-boot
 
-# Создаем клон для $(NAME)
-.create-$(NAME): .create-FreeBSD-$(FREEBSD_VERSION)
-	'$(VBoxManage)' clonevm 'FreeBSD-$(FREEBSD_VERSION)' --mode=machine --name=$(VMName) --register --options=linked --snapshot=initial
-	'$(VBoxManage)' modifyvm '$(VMName)' --memory $(MemoryMB) --cpus '$(CPUCount)'
-	'$(VBoxManage)' modifyvm '$(VMName)' --nic1 nat --natpf1 'ssh,tcp,,2222,,22'
-	'$(VBoxManage)' modifyvm '$(VMName)' --natpf1 '$(NAME)-api,tcp,,2375,,2375'
-	touch .first-boot
-	touch '$@'
+.init-packages:
+	sh joker-run joker.d/pkg-bootstrap
+	touch $@
 
-.PHONY: create-$(NAME) 
-create-$(NAME): .create-$(NAME) ## Создать рабочую VM (клон от initial-снапшота)
+.install-virtualbox-additions: .init-packages
+	sh joker-run joker.d/install-virtualbox-additions
+	touch $@
 
-.PHONY: delete-$(NAME)
-delete-$(NAME):
-	-$(MAKE) $(NAME)-detach-data-disk
-	'$(VBoxManage)' unregistervm '$(VMName)' --delete
-	-rm ./.ssh
-	rm .create-$(NAME)
+.install-sudo: .init-packages
+	sh joker-run joker.d/install-sudo
+	touch $@
 
-.PHONY: start-$(NAME) ## Удалить рабочую VM (включая диск)
-start-$(NAME): .create-$(NAME) .$(NAME)-attach-data-disk ## Запустить $(NAME) (настроит SSH при первом запуске)
-	@if [ -f .first-boot ]; then \
-		VBoxManage='$(VBoxManage)' VMName='$(VMName)' \
-			TMP_DIR='$(TMP_DIR)' SSH_DIR='$(SSH_DIR)' sh first-boot.sh && \
-		rm .first-boot; \
-	else \
-		'$(VBoxManage)' startvm '$(VMName)' --type headless && \
-		: "press enter on boot menu to speed up start freebsd" && \
-		sleep 3 && \
-		'$(VBoxManage)' controlvm '$(VMName)' keyboardputscancode 1c; \
-	fi
+.install-mc: .init-packages
+	sh joker-run joker.d/install-mc
+	touch $@
 
-.PHONY: stop-$(NAME) 
-stop-$(NAME): ## Выключить $(NAME) через ACPI
+.add-mount-point: .install-virtualbox-additions
+	sh joker-run joker.d/add-mount-point projects /home/joker/projects
+	touch $@
+
+.setup-workpool:
+	sh joker-run joker.d/setup-workpool
+	touch $@
+
+.PHONY: start-joker
+start-joker: .first-boot .attach-data-disk ## Запустить joker
+	'$(VBoxManage)' startvm '$(VMName)' --type headless
+	# press enter on boot menu to speed up start freebsd
+	sleep 3 && '$(VBoxManage)' controlvm '$(VMName)' keyboardputscancode 1c
+
+.PHONY: stop-joker 
+stop-joker: ## Выключить joker через ACPI
 	'$(VBoxManage)' controlvm '$(VMName)' acpipowerbutton
 	VBoxManage='$(VBoxManage)' VMName='$(VMName)' sh wait-for-poweroff.sh
-	-$(MAKE) $(NAME)-detach-data-disk
+	$(MAKE) detach-data-disk
 
 .PHONY: vbox-help
 vbox-help: ## Показать справку VBoxManage
@@ -142,7 +174,7 @@ vbox-help: ## Показать справку VBoxManage
 
 .PHONY: clean
 clean: ## Остановить и удалить ВСЕ + временные файлы
-	-$(MAKE) stop-$(NAME)
-	-$(MAKE) delete-$(NAME)
+	-$(MAKE) stop-joker
+	-$(MAKE) delete-joker
 	-$(MAKE) delete-freebsd
 	-rm -fr ./tmp/

@@ -49,30 +49,29 @@ EOF
 rm "$initial_configure"
 
 timeout=$sshd_timeout
-echo -n "Waiting for sshd startup...$timeout"
+printf "Waiting for sshd startup...$timeout"
 
 while true; do
     sleep 2
     timeout=$(( timeout - 2 ))
 
     if [ $(( timeout % 10 )) -eq 0 ]; then
-        echo -n $timeout
+        printf -n $timeout
     else
-        echo -n '.'
+        printf '.'
     fi
     if [ $timeout -le 0 ]; then
         echo " timeout expired"
         exit 1
     fi
 
-    if ssh-keyscan -t ed25519,rsa -p 2222 127.0.0.1 > "$ssh_dir/known_hosts" 2>/dev/null; then
-        ssh-keyscan -t ed25519,rsa -p 2222 localhost >> "$ssh_dir/known_hosts" 2>/dev/null
+    host_key=$(ssh-keyscan -t ed25519,rsa -p 2222 127.0.0.1 2>/dev/null || true)
+    if [ -n "$host_key" ]; then
+        echo "$host_key" > "$ssh_dir/known_hosts"
         echo " done"
         break
     fi
 done
 
-sh install-sudo.sh
-
-echo "Provisioning commands sent. VM ready for SSH on port 2222"
-echo "Use: sh joker [COMMAND]"
+echo "Provisioninug commands sent. VM ready for SSH on port 2222"
+echo "Use: sh joker-run {command | script} [args...]"

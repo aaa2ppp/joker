@@ -7,13 +7,13 @@ set -e
 
 timeout=${1:-60}
 
-echo -n "Waiting for VM '$VMName' to power off..."
+printf "Waiting for VM '$VMName' to power off..."
 
 while "$VBoxManage" showvminfo "$VMName" --machinereadable 2>/dev/null | grep -q 'VMState="running\|paused\|stopping"'; do
     if [ $(( timeout % 5 )) -eq 0 ]; then
-        echo -n "$timeout"
+        printf "$timeout"
     else
-        echo -n "."
+        printf "."
     fi
     if [ $timeout -le 0 ]; then
         echo " timeout expired"

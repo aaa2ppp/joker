@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+ASSUME_ALWAYS_YES=yes
+
+pkg install -y virtualbox-ose-additions-nox11
+
+sysrc vboxguest_enable="YES"
+sysrc vboxservice_enable="YES"
+
+service vboxguest start
+service vboxservice start

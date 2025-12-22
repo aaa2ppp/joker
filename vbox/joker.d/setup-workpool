@@ -16,11 +16,6 @@ if ! zpool list | grep -q '^workpool'; then
         # Создаём ZFS-пул
         zpool create -f -o ashift=12 -O mountpoint=/work workpool /dev/${disk}p1
 
-        # Опционально: создаём датасеты
-        # zfs create workpool/src
-        # zfs create workpool/jails
-        # zfs create workpool/logs
-
         echo "Data pool 'workpool' created at /work"
     else
         echo "WARNING: /disk/${disk} not found — skipping data disk setup"

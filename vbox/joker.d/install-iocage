@@ -4,7 +4,6 @@ set -e
 
 export ASSUME_ALWAYS_YES=yes 
 
-pkg update
 pkg install -y py311-iocage
 iocage activate workpool
 

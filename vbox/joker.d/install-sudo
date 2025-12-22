@@ -1,0 +1,8 @@
+#!/bin/sh
+
+set -e
+
+export ASSUME_ALWAYS_YES=yes 
+
+pkg install -y sudo
+echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /usr/local/etc/sudoers.d/wheel-nopasswd

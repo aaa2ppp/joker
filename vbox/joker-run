@@ -12,20 +12,20 @@ name="joker"
 remote_host="127.0.0.1"
 
 ssh_dir="${SSH_DIR:-"./.ssh"}"
-ssh_opts="-i $ssh_dir/id_ed25519 -o UserKnownHostsFile=$ssh_dir/known_hosts"
+ssh_opts=$(printf "%q " -i "$ssh_dir/id_ed25519" -o UserKnownHostsFile="$ssh_dir/known_hosts")
 
 # Если первый аргумент — существующий файл, это скрипт
 if [ -f "$1" ]; then
-    SCRIPT="$1"
+    script="$1"
     shift
     # Копируем скрипт в VM (временный файл)
-    REMOTE_SCRIPT="/tmp/$(basename "$SCRIPT").$$"
-    scp $ssh_opts -P 2222 "$SCRIPT" $name@$remote_host:"$REMOTE_SCRIPT"
+    remote_script="/tmp/$(basename "$script").$$"
+    scp $ssh_opts -P 2222 "$script" $name@$remote_host:"$remote_script"
     # Выполняем + удаляем
-    CMD=$(printf '%q ' "$REMOTE_SCRIPT" "$@")
-    ssh $ssh_opts -p 2222 $name@$remote_host "chmod +x '$REMOTE_SCRIPT' && su -m root -c '$CMD' && rm '$REMOTE_SCRIPT'"
+    cmd=$(printf '%q ' "$remote_script" "$@")
+    ssh $ssh_opts -p 2222 $name@$remote_host 'chmod +x "'"$remote_script"'" && su -m root -c "'"$cmd"'" && rm "'"$remote_script"'"'
 else
     # Выполняем команду напрямую
-    CMD=$(printf '%q ' "$@")
-    ssh $ssh_opts -p 2222 $name@$remote_host "su -m root -c '$CMD'"
+    cmd=$(printf '%q ' "$@")
+    ssh $ssh_opts -p 2222 $name@$remote_host 'su -m root -c "'"$cmd"'"'
 fi
