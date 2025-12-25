@@ -1,4 +1,10 @@
 #!/bin/sh
 
-ssh_dir=${SSH_DIR:-"$(dirname "$0")/.ssh"}
-exec ssh -i $ssh_dir/id_ed25519 -o UserKnownHostsFile=$ssh_dir/known_hosts -p 2222 joker@127.0.0.1 "$@"
+: ${SSH_DIR:=".joker/ssh"}
+: ${SSH_KEY:="$SSH_DIR/id_ed25519"}
+: ${USER_NAME:="joker"}
+: ${REMOTE_HOST:="127.0.0.1"}
+: ${REMOTE_PORT:=2222}
+
+ssh_opts=$(printf "%q " -i "$SSH_KEY" -o UserKnownHostsFile="$SSH_DIR/known_hosts")
+exec ssh $ssh_opts -p "$REMOTE_PORT" "$USER_NAME@$REMOTE_HOST" "$@"

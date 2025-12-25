@@ -4,15 +4,17 @@
 set -e
 
 if [ $# -eq 0 ]; then
-    echo "Usage: $0 <script.sh> | <command> [args...]"
+    echo "Usage: $0 {script|command} [args...]"
     exit 1
 fi
 
-name="joker"
-remote_host="127.0.0.1"
+: ${SSH_DIR:=".joker/ssh"}
+: ${SSH_KEY:="$SSH_DIR/id_ed25519"}
+: ${USER_NAME:="joker"}
+: ${REMOTE_HOST:="127.0.0.1"}
+: ${REMOTE_PORT:=2222}
 
-ssh_dir="${SSH_DIR:-"./.ssh"}"
-ssh_opts=$(printf "%q " -i "$ssh_dir/id_ed25519" -o UserKnownHostsFile="$ssh_dir/known_hosts")
+ssh_opts=$(printf "%q " -i "$SSH_KEY" -o UserKnownHostsFile="$SSH_DIR/known_hosts")
 
 # Если первый аргумент — существующий файл, это скрипт
 if [ -f "$1" ]; then
@@ -20,12 +22,12 @@ if [ -f "$1" ]; then
     shift
     # Копируем скрипт в VM (временный файл)
     remote_script="/tmp/$(basename "$script").$$"
-    scp $ssh_opts -P 2222 "$script" $name@$remote_host:"$remote_script"
+    scp $ssh_opts -P "$REMOTE_PORT" "$script" "$USER_NAME@$REMOTE_HOST":"$remote_script"
     # Выполняем + удаляем
     cmd=$(printf '%q ' "$remote_script" "$@")
-    ssh $ssh_opts -p 2222 $name@$remote_host 'chmod +x "'"$remote_script"'" && su -m root -c "'"$cmd"'" && rm "'"$remote_script"'"'
+    ssh $ssh_opts -p "$REMOTE_PORT" "$USER_NAME@$REMOTE_HOST" 'chmod +x "'"$remote_script"'" && su -m root -c "'"$cmd"'" && rm "'"$remote_script"'"'
 else
     # Выполняем команду напрямую
     cmd=$(printf '%q ' "$@")
-    ssh $ssh_opts -p 2222 $name@$remote_host 'su -m root -c "'"$cmd"'"'
+    ssh $ssh_opts -p "$REMOTE_PORT" "$USER_NAME@$REMOTE_HOST" 'su -m root -c "'"$cmd"'"'
 fi

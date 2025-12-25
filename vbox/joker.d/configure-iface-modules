@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -e
+
+: ${FBSD_NIC_TYPE:=vtnet}
+
+# load nic modules
+for nic_type in $FBSD_NIC_TYPE bridge epair; do
+    if kldstat -q -m if_$nic_type; then
+        continue
+    fi
+
+    if ! kldload if_$nic_type; then
+        continue
+    fi
+
+    echo "if_${nic_type}_load=YES" >> /boot/loader.conf
+
+    if [ "$nic_type" = "bridge" ]; then
+        # configure bridge
+        sysctl net.inet.ip.forwarding=1
+        sysctl net.link.bridge.pfil_onlyip=0
+        sysctl net.link.bridge.pfil_bridge=0
+        sysctl net.link.bridge.pfil_member=0
+
+        cat >> /etc/sysctl.conf << EOF
+
+net.inet.ip.forwarding=1       # Enable IP forwarding between interfaces
+net.link.bridge.pfil_onlyip=0  # Only pass IP packets when pfil is enabled
+net.link.bridge.pfil_bridge=0  # Packet filter on the bridge interface
+net.link.bridge.pfil_member=0  # Packet filter on the member interface
+EOF
+    fi
+done

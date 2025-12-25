@@ -2,36 +2,23 @@
 
 set -e
 
-echo "Provisioning on first boot..."
-
 : ${VBoxManage:?}
 : ${VMName:?}
 
-tmp_dir=${TMP_DIR:-"./tmp"}
-mkdir -p "$tmp_dir"
+: ${TMP_DIR:="./tmp"}
+: ${SSH_DIR:=".joker/ssh"}
+: ${SSH_KEY:="$SSH_DIR/id_ed25519"}
 
-ssh_dir=${SSH_DIR:-"./.ssh"}
-mkdir -p "$ssh_dir"
-chmod 0700 "$ssh_dir"
-
-boot_menu_timeout=5
 freebsd_timeout=60
-sshd_timeout=60
 
-ssh_key="$ssh_dir/id_ed25519"
-echo y | ssh-keygen -t ed25519 -f "$ssh_key" -N ""
-
-"$VBoxManage" startvm "$VMName" --type headless
-
-# press enter on boot menu to speed up start freebsd
-sleep $boot_menu_timeout
-"$VBoxManage" controlvm "$VMName" keyboardputscancode 1c
-
-echo "Waiting for FreeBSD startup $freebsd_timeout sec..."
+echo "Waiting for '$VMName' startup $freebsd_timeout sec..." >&2
 sleep $freebsd_timeout
 
 echo "Initial configuration of FreeBSD..."
-initial_configure="${tmp_dir}/initial_configure.$$"
+
+mkdir -p "$TMP_DIR"
+initial_configure="$TMP_DIR/initial_configure.$$"
+
 cat > "$initial_configure" << EOF
 root
 
@@ -39,7 +26,7 @@ pw useradd joker -G wheel -m -s /bin/sh -w no
 touch ~joker/.hushlogin
 mkdir -m 700 ~joker/.ssh
 chown joker:joker ~joker/.ssh
-echo "$(cat "${ssh_key}.pub")" > ~joker/.ssh/authorized_keys
+echo "$(cat "${SSH_KEY}.pub")" > ~joker/.ssh/authorized_keys
 sysrc sshd_enable=YES
 service sshd start
 exit
@@ -47,31 +34,3 @@ EOF
 
 "$VBoxManage" controlvm "$VMName" keyboardputfile "$initial_configure"
 rm "$initial_configure"
-
-timeout=$sshd_timeout
-printf "Waiting for sshd startup...$timeout"
-
-while true; do
-    sleep 2
-    timeout=$(( timeout - 2 ))
-
-    if [ $(( timeout % 10 )) -eq 0 ]; then
-        printf -n $timeout
-    else
-        printf '.'
-    fi
-    if [ $timeout -le 0 ]; then
-        echo " timeout expired"
-        exit 1
-    fi
-
-    host_key=$(ssh-keyscan -t ed25519,rsa -p 2222 127.0.0.1 2>/dev/null || true)
-    if [ -n "$host_key" ]; then
-        echo "$host_key" > "$ssh_dir/known_hosts"
-        echo " done"
-        break
-    fi
-done
-
-echo "Provisioninug commands sent. VM ready for SSH on port 2222"
-echo "Use: sh joker-run {command | script} [args...]"

@@ -1,25 +1,36 @@
 #!/bin/sh
 
-disk="ada1"
+set -e
 
-if ! zpool list | grep -q '^workpool'; then
-    if [ -e /dev/ada1 ]; then
-        echo "Setting up data disk on /dev/$disk..."
+: ${DISK:="ada1"}
 
-        # Уничтожаем возможную старую разметку
-        gpart destroy -F $disk 2>/dev/null || true
+zpool import -f workpool 2>/dev/null || true
 
-        # Создаём новый GPT и раздел
-        gpart create -s gpt $disk
-        gpart add -t freebsd-zfs -l workdisk ${disk}
-
-        # Создаём ZFS-пул
-        zpool create -f -o ashift=12 -O mountpoint=/work workpool /dev/${disk}p1
-
-        echo "Data pool 'workpool' created at /work"
-    else
-        echo "WARNING: /disk/${disk} not found — skipping data disk setup"
-    fi
-else
-    echo "Data pool 'workpool' already exists"
+if zpool list | grep -q '^workpool'; then
+    echo "Data pool 'workpool' already exists" >&2
+    exit 0
 fi
+
+if [ ! -e "/dev/$DISK" ]; then
+    echo "ERROR: /dev/$DISK not found — skipping data DISK setup" >&2
+    exit 1
+fi
+
+if gpart show "$DISK" | grep -q freebsd-zfs; then
+    echo "ERROR: /dev/$DISK already contains freebsd-zfs part — skipping data DISK setup" >&2
+    exit 1
+fi
+   
+echo "Setting up data DISK on /dev/$DISK..." >&2
+
+# Уничтожаем возможную старую разметку
+gpart destroy -F $DISK 2>/dev/null || true
+
+# Создаём новый GPT и раздел
+gpart create -s gpt $DISK
+gpart add -t freebsd-zfs -l workdisk $DISK
+
+# Создаём ZFS-пул
+zpool create -f -o ashift=12 -O mountpoint=/work workpool /dev/${DISK}p1
+
+echo "Data pool 'workpool' created at /work" >&2

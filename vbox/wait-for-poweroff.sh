@@ -7,20 +7,30 @@ set -e
 
 timeout=${1:-60}
 
-printf "Waiting for VM '$VMName' to power off..."
+printf "Waiting for '$VMName' to power off: " >&2
 
-while "$VBoxManage" showvminfo "$VMName" --machinereadable 2>/dev/null | grep -q 'VMState="running\|paused\|stopping"'; do
-    if [ $(( timeout % 5 )) -eq 0 ]; then
-        printf "$timeout"
-    else
-        printf "."
-    fi
-    if [ $timeout -le 0 ]; then
-        echo " timeout expired"
-        exit 1
-    fi
+while [ $timeout -gt 0 ]; do
     sleep 2
     timeout=$(( timeout - 2 ))
+
+    state="$("$VBoxManage" showvminfo "$VMName" --machinereadable)"
+
+    if echo "$state" | grep -q 'VMState="poweroff"'; then 
+        echo "POWER OFF" >&2
+        exit 0
+    fi
+
+    if echo "$state" | grep -q 'VMState="aborted"'; then 
+        echo "ERROR: VM ABORTED" >&2
+        exit 1
+    fi    
+
+    if [ $(( timeout % 10 )) -eq 0 ]; then
+        printf "$timeout" >&2
+    else
+        printf "." >&2
+    fi
 done
 
-echo " poweroff"
+echo "TIMEOUT" >&2
+exit 1

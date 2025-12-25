@@ -1,0 +1,38 @@
+#!/bin/sh
+
+set -e
+
+usage="Usage: $0 <name> <path>"
+name=${1:?$usage}
+path=${2:?$usage}
+
+uid=$(id -u joker)
+gid=$(id -g joker)
+
+rc_name="mount_$name"
+rc_script="/usr/local/etc/rc.d/$rc_name"
+
+cat > "$rc_script" << EOF
+#!/bin/sh
+
+# PROVIDE: $rc_name
+# REQUIRE: DAEMON vboxguest
+# BEFORE: LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="$rc_name"
+rcvar="${rc_name}_enable"
+
+start_cmd="mkdir -p '$path' && chown joker:joker '$path' && mount -t vboxvfs -o 'rw,uid=$uid,gid=$gid' '$name' '$path'"
+stop_cmd="umount '$name'"
+
+load_rc_config \$name
+run_rc_command "\$1"
+EOF
+
+chmod +x "$rc_script"
+
+sysrc   "${rc_name}_enable"="YES"
+service "$rc_name" start
