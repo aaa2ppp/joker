@@ -1,0 +1,15 @@
+#!/bin/sh
+
+templ_name=go-dev-templ
+
+if iocage list -t -H | cut -f2 | grep -q go-dev-templ; then
+    echo "Template '$templ_name' already exists"
+    exit 0
+fi
+
+iocage create -r LATEST -n "$templ_name" dhcp=on
+iocage start "$templ_name"
+iocage exec  "$templ_name" sed -i '' 's|pkg+https://|https://|g' /etc/pkg/FreeBSD.conf
+iocage pkg   "$templ_name" install -y go git bash curl
+iocage stop  "$templ_name"
+iocage set template=yes "$templ_name"

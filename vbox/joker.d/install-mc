@@ -2,7 +2,7 @@
 
 set -e
 
-ASSUME_ALWAYS_YES=yes
+export ASSUME_ALWAYS_YES=yes
 
 pkg install -y bash mc
 

@@ -3,5 +3,5 @@
 # Обход проблемы SRV в домашних сетях
 sed -i '' 's|pkg+https://|https://|g' /etc/pkg/FreeBSD.conf
 
-ASSUME_ALWAYS_YES=yes
+export ASSUME_ALWAYS_YES=yes
 pkg bootstrap -y

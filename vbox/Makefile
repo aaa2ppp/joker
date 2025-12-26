@@ -107,10 +107,11 @@ delete-freebsd: ## Удалить эталонную VM
 	@touch '$@'
 
 .joker/configure-vm: .joker/create-vm
+	@# Use --nictype1 (legacy syntax VBox 6.1 vs --nic-type1) for maximum compatibility: works in VBox 6.1 and still supported in 7.x
 	@'$(VBoxManage)' modifyvm '$(VMName)' \
 		--graphicscontroller vboxsvga --vram 2 \
 		--memory $(MemoryMB) --cpus '$(CPUCount)' \
-		--nic-type1 $(VBOX_NIC_TYPE) \
+		--nictype1 $(VBOX_NIC_TYPE) \
 		--nic1 nat \
 		--natpf1 'ssh,tcp,,2222,,22'
 	@touch '$@'
