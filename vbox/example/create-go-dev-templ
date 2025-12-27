@@ -2,7 +2,7 @@
 
 templ_name=go-dev-templ
 
-if iocage list -t -H | cut -f2 | grep -q go-dev-templ; then
+if iocage list -t -H | cut -f2 | grep -q "$templ_name"; then
     echo "Template '$templ_name' already exists"
     exit 0
 fi

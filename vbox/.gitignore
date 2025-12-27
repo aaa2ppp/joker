@@ -1,5 +1,8 @@
 .*
 !.gitignore
 tmp/
+download/
 image/
 data/
+bak/
+bak[0-9]/

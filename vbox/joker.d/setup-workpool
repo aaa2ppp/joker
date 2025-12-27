@@ -12,12 +12,12 @@ if zpool list | grep -q '^workpool'; then
 fi
 
 if [ ! -e "/dev/$DISK" ]; then
-    echo "ERROR: /dev/$DISK not found — skipping data DISK setup" >&2
+    echo "ERROR: /dev/$DISK not found - skipping data DISK setup" >&2
     exit 1
 fi
 
 if gpart show "$DISK" | grep -q freebsd-zfs; then
-    echo "ERROR: /dev/$DISK already contains freebsd-zfs part — skipping data DISK setup" >&2
+    echo "ERROR: /dev/$DISK already contains freebsd-zfs part - skipping data DISK setup" >&2
     exit 1
 fi
    

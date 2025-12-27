@@ -1,5 +1,5 @@
 #!/bin/sh
-# joker-run — выполняет СКРИПТ ИЛИ КОМАНДУ внутри joker
+# joker-run — выполняет СКРИПТ ИЛИ КОМАНДУ внутри Joker от root
 
 set -e
 
