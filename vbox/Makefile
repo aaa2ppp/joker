@@ -211,7 +211,7 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 	.joker/setup-workpool \
 	.joker/mount-shared-folder \
 	.joker/configure-iface-modules \
-	.joker/configure-bridge0 \
+	.joker/configure-network \
 	.joker/install-sudo \
 	.joker/install-iocage
 
@@ -252,12 +252,17 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 	@FBSD_NIC_TYPE=$(FBSD_NIC_TYPE) sh joker-run joker.d/configure-iface-modules
 	@touch '$@'
 
-.joker/configure-bridge0: .joker/configure-iface-modules
+.joker/install-dnsmasq: .joker/init-packages
 	@$(MAKE) start-joker
-	@FBSD_NIC_TYPE=$(FBSD_NIC_TYPE) sh joker-run joker.d/configure-bridge0
+	@sh joker-run joker.d/install-dnsmasq
 	@touch '$@'
 
-.joker/install-iocage: .joker/setup-workpool
+.joker/configure-network: .joker/install-dnsmasq
+	@$(MAKE) start-joker
+	@FBSD_NIC_TYPE=$(FBSD_NIC_TYPE) sh joker-run joker.d/configure-network
+	@touch '$@'
+
+.joker/install-iocage: .joker/init-packages .joker/setup-workpool
 	@$(MAKE) start-joker
 	@sh joker-run joker.d/install-iocage
 	@touch '$@'

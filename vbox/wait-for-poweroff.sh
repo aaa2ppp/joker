@@ -5,14 +5,19 @@ set -e
 : ${VBoxManage:?}
 : ${VMName:?}
 
-timeout=${1:-60}
+: ${CHECKS:="0 5 10 15 25 40 60"}
+: ${OFFSET:=5}
 
 printf "Waiting for '$VMName' to power off: " >&2
 
-while [ $timeout -gt 0 ]; do
-    sleep 2
-    timeout=$(( timeout - 2 ))
-
+start=$(date +%s)
+for check_time in $CHECKS; do
+    # Ждём до времени проверки
+    while [ $(date +%s) -lt $(( start + OFFSET + check_time )) ]; do
+        sleep 1
+        printf "." >&2
+    done
+    
     state="$("$VBoxManage" showvminfo "$VMName" --machinereadable)"
 
     if echo "$state" | grep -q 'VMState="poweroff"'; then 
@@ -24,12 +29,6 @@ while [ $timeout -gt 0 ]; do
         echo "ERROR: VM ABORTED" >&2
         exit 1
     fi    
-
-    if [ $(( timeout % 10 )) -eq 0 ]; then
-        printf "$timeout" >&2
-    else
-        printf "." >&2
-    fi
 done
 
 echo "TIMEOUT" >&2
