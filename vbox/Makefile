@@ -212,6 +212,7 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 	.joker/mount-shared-folder \
 	.joker/configure-iface-modules \
 	.joker/configure-network \
+	.joker/install-bind-tools \
 	.joker/install-sudo \
 	.joker/install-iocage
 
@@ -255,6 +256,11 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 .joker/install-dnsmasq: .joker/init-packages
 	@$(MAKE) start-joker
 	@sh joker-run joker.d/install-dnsmasq
+	@touch '$@'
+
+.joker/install-bind-tools: .joker/init-packages
+	@$(MAKE) start-joker
+	@sh joker-run joker.d/install-bind-tools
 	@touch '$@'
 
 .joker/configure-network: .joker/install-dnsmasq
