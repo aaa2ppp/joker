@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 templ_name=go-dev-templ
 packages="go git bash curl gmake"
 
@@ -10,7 +12,11 @@ fi
 
 iocage create -r LATEST -n "$templ_name" dhcp=on
 iocage start "$templ_name"
-iocage exec  "$templ_name" mkdir /var/cache/pkg
+
+# Обход проблемы SRV в домашних сетях
+iocage exec "$templ_name" sed -i '' 's|pkg+https://|https://|g' /etc/pkg/FreeBSD.conf
+
+iocage exec "$templ_name" mkdir /var/cache/pkg
 iocage fstab -a "$templ_name" /var/cache/pkg /var/cache/pkg nullfs ro 0 0
 
 export ASSUME_ALWAYS_YES=yes

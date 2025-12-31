@@ -1,11 +1,13 @@
 #!/bin/sh
 
+set -e
+
 # Обход проблемы SRV в домашних сетях
 sed -i '' 's|pkg+https://|https://|g' /etc/pkg/FreeBSD.conf
 
 # Располагаем кеш на workpool
 workpool_mountpoint=$(zfs get -H -t fs -o value mountpoint workpool)
-zfs list -H workpool/cache/pkg >/dev/null || zfs create workpool/cache/pkg
+zfs list -H workpool/cache/pkg 2>/dev/null || zfs create -p workpool/cache/pkg
 rm -fr /var/cache/pkg 2>/dev/null || true
 ln -s "$workpool_mountpoint/cache/pkg" /var/cache/pkg
 
