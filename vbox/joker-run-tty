@@ -1,0 +1,37 @@
+#!/bin/sh
+# joker-run — выполняет СКРИПТ ИЛИ КОМАНДУ внутри Joker от root
+
+set -e
+
+# Это КОСТЫЛЬ по быстрому.
+# Добавляем -tt при вызове ssh, чтобы скрипт на удаленной стороне получал наш ^C.
+tty="-tt"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 {script|command} [args...]"
+    exit 1
+fi
+
+: ${SSH_DIR:=".joker/ssh"}
+: ${SSH_KEY:="$SSH_DIR/id_ed25519"}
+: ${USER_NAME:="joker"}
+: ${REMOTE_HOST:="127.0.0.1"}
+: ${REMOTE_PORT:=2222}
+
+ssh_opts=$(printf "%q " -i "$SSH_KEY" -o UserKnownHostsFile="$SSH_DIR/known_hosts")
+
+# Если первый аргумент — существующий файл, это скрипт
+if [ -f "$1" ]; then
+    script="$1"
+    shift
+    # Копируем скрипт в VM (временный файл)
+    remote_script="/tmp/$(basename "$script").$$"
+    scp $ssh_opts -P "$REMOTE_PORT" "$script" "$USER_NAME@$REMOTE_HOST":"$remote_script"
+    # Выполняем + удаляем
+    cmd=$(printf '%q ' "$remote_script" "$@")
+    ssh $tty $ssh_opts -p "$REMOTE_PORT" "$USER_NAME@$REMOTE_HOST" 'chmod +x "'"$remote_script"'" && su -m root -c "'"$cmd"'" && rm "'"$remote_script"'"'
+else
+    # Выполняем команду напрямую
+    cmd=$(printf '%q ' "$@")
+    ssh $tty $ssh_opts -p "$REMOTE_PORT" "$USER_NAME@$REMOTE_HOST" 'su -m root -c "'"$cmd"'"'
+fi

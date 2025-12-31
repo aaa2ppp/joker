@@ -1,6 +1,7 @@
 #!/bin/sh
 
 templ_name=go-dev-templ
+packages="go git bash curl gmake"
 
 if iocage list -t -H | cut -f2 | grep -q "$templ_name"; then
     echo "Template '$templ_name' already exists"
@@ -9,7 +10,12 @@ fi
 
 iocage create -r LATEST -n "$templ_name" dhcp=on
 iocage start "$templ_name"
-iocage exec  "$templ_name" sed -i '' 's|pkg+https://|https://|g' /etc/pkg/FreeBSD.conf
-iocage pkg   "$templ_name" install -y go git bash curl
-iocage stop  "$templ_name"
-iocage set template=yes "$templ_name"
+iocage exec  "$templ_name" mkdir /var/cache/pkg
+iocage fstab -a "$templ_name" /var/cache/pkg /var/cache/pkg nullfs ro 0 0
+
+export ASSUME_ALWAYS_YES=yes
+pkg fetch -y -d $packages
+pkg -j "ioc-$templ_name" install -y $packages
+
+iocage stop "$templ_name"
+iocage set  template=yes "$templ_name"

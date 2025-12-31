@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+
+jail_name=qmail-smtpd-dev
+jail_templ=go-dev-templ
+packages="ucspi-tcp netqmail vpopmail"
+
+if iocage list -t -H | cut -f2 | grep -q "$jail_name"; then
+    echo "Jail '$jail_name' already exists"
+    exit 0
+fi
+
+iocage create -t "$jail_templ" -n "$jail_name" dhcp=on
+iocage start "$jail_name"
+iocage exec  "$jail_name" mkdir -p /var/cache/pkg
+iocage fstab -a "$jail_name" /var/cache/pkg /var/cache/pkg nullfs ro 0 0
+
+export ASSUME_ALWAYS_YES=yes
+pkg fetch -y -d $packages
+pkg -j "ioc-$jail_name" install -y $packages

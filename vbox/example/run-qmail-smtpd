@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -e
+
+jail_name=qmail-smtpd-dev
+jail_root_dir=$(zfs get -H -o value -t fs mountpoint "workpool/iocage/jails/$jail_name/root")
+
+project_dir="/mnt/projects/qmail-smtpd"
+build_dir="/var/projects/qmail-smtpd"
+
+echo "Copy code to '${jail_root_dir}${build_dir}'..." >&2
+mkdir -p "${jail_root_dir}${build_dir}"
+rsync -av --delete \
+    --exclude='.git/' \
+    --exclude='bin/' \
+    --exclude='tmp/' \
+    --exclude='bak/' \
+    --exclude='bak[0-9]/' \
+    --exclude='qmail-src/' \
+    --exclude='.DS_Store/' \
+    "$project_dir/" "${jail_root_dir}${build_dir}/"
+
+iocage exec -f "$jail_name" sh -c "cd '$build_dir' && gmake clean all"
+iocage exec -f "$jail_name" sh -c "cd '$build_dir' && cp var/qmail/bin/qmail-smtpd /usr/local/bin/my-qmail-smtpd && cp docker/entrypoint.sh /"
+iocage exec -f "$jail_name" sh -c "LOG_LEVEL=DEBUG LOCAL='example.org' sh /entrypoint.sh"

@@ -6,12 +6,13 @@ usage="Usage: $0 <name> <path>"
 name=${1:?$usage}
 path=${2:?$usage}
 
-uid=$(id -u joker)
-gid=$(id -g joker)
-
 rc_name="mount_$name"
 rc_script="/usr/local/etc/rc.d/$rc_name"
 
+# NOTE: Не верь `mount_vboxvfs -h`!
+# По умолчанию файловая система монтируется RW с правами 0777.
+# Использование опции -r (-o ro) приводит к ошибке.
+# Флаг --readonly на стороне хост-компьютера решает.
 cat > "$rc_script" << EOF
 #!/bin/sh
 
@@ -25,7 +26,7 @@ cat > "$rc_script" << EOF
 name="$rc_name"
 rcvar="${rc_name}_enable"
 
-start_cmd="mkdir -p '$path' && chown joker:joker '$path' && mount -t vboxvfs -o 'rw,uid=$uid,gid=$gid' '$name' '$path'"
+start_cmd="mkdir -p '$path' && mount -t vboxvfs '$name' '$path'"
 stop_cmd="umount '$name'"
 
 load_rc_config \$name

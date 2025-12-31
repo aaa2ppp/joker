@@ -26,10 +26,13 @@ SSH_KEY := $(SSH_DIR)/id_ed25519
 DATA_DISK_SIZE_GB := 30
 DATA_DISK_VDI     := $(PWD)/data/$(VMName)-data.vdi
 
+SHARED_FOLDER_NAME  := projects
 # Convert Git Bash path (like /c/Users/...) to Windows path for VirtualBox
-SHARED_FOLDER := $(shell echo ~/Projects | sed -E 's|^/([c-z])/|\1:/|')
+SHARED_FOLDER_HOST  := $(shell echo ~/Projects | sed -E 's|^/([c-z])/|\1:/|')
+SHARED_FOLDER_GUEST := /mnt/$(SHARED_FOLDER_NAME)
 
-all:
+.PHONY: all
+all: help
 
 # === AUTO-GENERATED HELP ===
 # Usage: комментарий вида ## текст после объявления цели
@@ -166,10 +169,11 @@ detach-data-disk: ## Отключить диск данных
 
 # Подключаем общую папку с хост-машины
 .joker/add-shared-folder: .joker/create-vm
+	@# NOTE: --automount --auto-mount-point=... these options do not work on freebsd
 	@'$(VBoxManage)' sharedfolder add '$(VMName)' \
-		--name='projects' \
-		--hostpath='$(SHARED_FOLDER)' \
-		--automount --auto-mount-point=/home/joker/projects
+		--name='$(SHARED_FOLDER_NAME)' \
+		--hostpath='$(SHARED_FOLDER_HOST)' \
+		--readonly 
 	@touch '$@'
 
 # === Start/Stop Joker VM ===
@@ -213,14 +217,15 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 	.joker/configure-iface-modules \
 	.joker/configure-network \
 	.joker/install-bind-tools \
+	.joker/install-rsync \
 	.joker/install-sudo \
 	.joker/install-iocage
 
 	@touch '$@'
 
-.joker/init-packages:
+.joker/init-packages: .joker/setup-workpool
 	@$(MAKE) start-joker
-	@sh joker-run joker.d/pkg-bootstrap
+	@sh joker-run joker.d/init-packages
 	@touch '$@'
 
 .joker/install-sudo: .joker/init-packages
@@ -240,7 +245,7 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 
 .joker/mount-shared-folder: .joker/install-virtualbox-additions
 	@$(MAKE) start-joker
-	@sh joker-run joker.d/mount-shared-folder projects /home/joker/projects
+	@sh joker-run joker.d/mount-shared-folder '$(SHARED_FOLDER_NAME)' '$(SHARED_FOLDER_GUEST)'
 	@touch '$@'
 
 .joker/install-virtualbox-additions: .joker/init-packages
@@ -256,6 +261,11 @@ init-jail-env: .joker/init-jail-env ## Настроить окружение д�
 .joker/install-dnsmasq: .joker/init-packages
 	@$(MAKE) start-joker
 	@sh joker-run joker.d/install-dnsmasq
+	@touch '$@'
+
+.joker/install-rsync: .joker/init-packages
+	@$(MAKE) start-joker
+	@sh joker-run joker.d/install-rsync
 	@touch '$@'
 
 .joker/install-bind-tools: .joker/init-packages

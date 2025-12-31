@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -x
+sleep 10
+exit 42
